@@ -1,1 +1,5 @@
 seed: 42
+data:
+  metadata_csv: datasets/raw/kneemridataset/metadata.csv
+  volumes_dir: datasets/raw/volumetric_data
+  interim_dir: datasets/interim

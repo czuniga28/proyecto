@@ -1,26 +1,19 @@
-from lib2to3.fixes import fix_throw
-from lib2to3.fixes import fix_throw
-from lib2to3.fixes import fix_throw
-from lib2to3.fixes import fix_throw
 from pathlib import Path
 import pandas as pd
 import pickle
 
 # Build manifest to work at and dont touch raw data
-def build_manifest(raw_data: str | Path) -> pd.DataFrame:
+def build_manifest(metadata_csv: str | Path, volumes_dir: str | Path) -> pd.DataFrame:
     """
-    Build a manifest dataframe from the raw data directory.
+    Build a manifest dataframe from the dataset metadata and volume files.
 
-    Reads the metadata.csv, checks for file existence, and loads
+    Reads metadata_csv, checks for file existence under volumes_dir, and loads
     the shape and dtype from each .pck file. Enforces unique
-    (examId, seriesNo) pairs.
+    (examId, seriesNo) pairs. Paths are stored relative to volumes_dir.
     """
-    # Path to raw data folder
-    raw_dir_path = Path(raw_data)
+    raw_dir_path = Path(volumes_dir)
 
-    # path to raw csv file from dataset
-    csv_path = raw_dir_path / "metadata.csv"
-    data = pd.read_csv(csv_path)
+    data = pd.read_csv(metadata_csv)
 
     # Enforce the key (Fail fast before processing files)
     if data.duplicated(subset=['examId', 'seriesNo']).any():
@@ -54,10 +47,10 @@ def build_manifest(raw_data: str | Path) -> pd.DataFrame:
             widths.append(pd.NA)
             dtypes.append(pd.NA)
             
-        # Assign and cast integer columns to 'Int64' to support pd.NA safely
-        data['depth'] = pd.Series(depths, dtype='Int64')
-        data['height'] = pd.Series(heights, dtype='Int64')
-        data['width'] = pd.Series(widths, dtype='Int64')
-        data['dtype'] = dtypes
+    # Assign and cast integer columns to 'Int64' to support pd.NA safely
+    data['depth'] = pd.Series(depths, dtype='Int64')
+    data['height'] = pd.Series(heights, dtype='Int64')
+    data['width'] = pd.Series(widths, dtype='Int64')
+    data['dtype'] = dtypes
 
     return data
