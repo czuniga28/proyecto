@@ -3,3 +3,6 @@ data:
   metadata_csv: datasets/raw/kneemridataset/metadata.csv
   volumes_dir: datasets/raw/volumetric_data
   interim_dir: datasets/interim
+split:
+  n_test_splits: 6   # test set = 1 of 6 SGKF folds (~16.7%)
+  n_cv_folds: 5
