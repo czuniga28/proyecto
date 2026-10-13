@@ -2,13 +2,12 @@ from pathlib import Path
 import pandas as pd
 import pickle
 
-# Build manifest to work at and dont touch raw data
 def build_manifest(metadata_csv: str | Path, volumes_dir: str | Path) -> pd.DataFrame:
     """
     Build a manifest dataframe from the dataset metadata and volume files.
 
     Reads metadata_csv, checks for file existence under volumes_dir, and loads
-    the shape and dtype from each .pck file. Enforces unique
+    the shape, dtype, and intensity stats from each .pck file. Enforces unique
     (examId, seriesNo) pairs. Paths are stored relative to volumes_dir.
     """
     raw_dir_path = Path(volumes_dir)
@@ -26,8 +25,9 @@ def build_manifest(metadata_csv: str | Path, volumes_dir: str | Path) -> pd.Data
     data['path'] = data['volumeFilename'].map(file_lookup)
     data['exists'] = data['path'].notna()
 
-    # Read shape and dtype from each file
+    # Read shape, dtype, and intensity stats from each file
     depths, heights, widths, dtypes = [], [], [], []
+    mins, maxs = [], []
 
     for _, row in data.iterrows():
         if row['exists']:
@@ -41,16 +41,22 @@ def build_manifest(metadata_csv: str | Path, volumes_dir: str | Path) -> pd.Data
                 heights.append(h)
                 widths.append(w)
                 dtypes.append(str(arr.dtype))
+                mins.append(arr.min())
+                maxs.append(arr.max())
         else:
             depths.append(pd.NA)
             heights.append(pd.NA)
             widths.append(pd.NA)
             dtypes.append(pd.NA)
+            mins.append(pd.NA)
+            maxs.append(pd.NA)
             
     # Assign and cast integer columns to 'Int64' to support pd.NA safely
     data['depth'] = pd.Series(depths, dtype='Int64')
     data['height'] = pd.Series(heights, dtype='Int64')
     data['width'] = pd.Series(widths, dtype='Int64')
     data['dtype'] = dtypes
+    data['intensity_min'] = pd.Series(mins, dtype='Int64')
+    data['intensity_max'] = pd.Series(maxs, dtype='Int64')
 
     return data

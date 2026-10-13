@@ -3,6 +3,7 @@ import pandas as pd
 from pathlib import Path
 from src.data.manifest import build_manifest
 from src.data.split import assign_splits
+from src.data.qa import run_qa_checks
 
 def main():
     # Enforce that paths are relative to the project root
@@ -19,10 +20,11 @@ def main():
     seed = config['seed']
     n_test_splits = config['split']['n_test_splits']
     n_cv_folds = config['split']['n_cv_folds']
+    max_prop_diff = config['split']['max_prop_diff']
 
     interim_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Manifest: build, save, summarize
+    # Manifest: build, save, summarize
     print(f"Building manifest from {volumes_dir}...")
     manifest_df = build_manifest(metadata_csv, volumes_dir)
 
@@ -41,8 +43,21 @@ def main():
     print("\nFiles on disk by aclDiagnosis class:")
     print(pd.crosstab(manifest_df['aclDiagnosis'], manifest_df['exists']))
 
-    # 2. Split: test set + CV folds, grouped by examId and stratified by class
-    splits_df = assign_splits(manifest_df, seed, n_test_splits, n_cv_folds)
+    # QA Checks
+    print("\nRunning QA checks...")
+    qa_df = run_qa_checks(manifest_df)
+    qa_path = interim_dir / "qa_report.csv"
+    qa_df.to_csv(qa_path, index=False)
+    
+    if not qa_df.empty:
+        print(f"\nQA Failed! Found {len(qa_df)} issues:")
+        print(qa_df)
+        raise SystemExit(f"\nPipeline stopped: QA checks failed. See {qa_path} for details.")
+    else:
+        print(f"QA passed! (0 issues found)")
+
+    # Split: test set + CV folds, grouped by examId and stratified by class
+    splits_df = assign_splits(manifest_df, seed, n_test_splits, n_cv_folds, max_prop_diff)
 
     splits_path = interim_dir / "splits.csv"
     splits_df[['examId', 'seriesNo', 'volumeFilename', 'aclDiagnosis', 'split']].to_csv(splits_path, index=False)
