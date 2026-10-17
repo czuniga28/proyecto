@@ -1,0 +1,79 @@
+\begin{thebibliography}{10}
+
+\bibitem{stajduhar2017semi}
+I.~{\v{S}}tajduhar, M.~Mamula, D.~Mileti{\'c}, and G.~{\"U}nal,
+  ``Semi-automated detection of anterior cruciate ligament injury from {MRI},''
+  {\em Computer Methods and Programs in Biomedicine}, vol.~140, pp.~151--164,
+  2017.
+
+\bibitem{zenodo_kneemri}
+I.~{\v{S}}tajduhar, M.~Mamula, D.~Mileti{\'c}, and G.~{\"U}nal, ``{KneeMRI}
+  dataset.'' Zenodo, registro 14789903, 2017.
+\newblock Versi{\'o}n v1, licencia CC BY-NC-ND 4.0.
+  \url{https://zenodo.org/records/14789903}.
+
+\bibitem{studer2021crispmlq}
+S.~Studer, T.~B. Bui, C.~Drescher, A.~Hanuschkin, L.~Winkler, S.~Peters, and
+  K.-R. M{\"u}ller, ``Towards {CRISP-ML(Q)}: A machine learning process model
+  with quality assurance methodology,'' {\em Machine Learning and Knowledge
+  Extraction}, vol.~3, no.~2, pp.~392--413, 2021.
+
+\bibitem{kaufman2012leakage}
+S.~Kaufman, S.~Rosset, C.~Perlich, and O.~Stitelman, ``Leakage in data mining:
+  Formulation, detection, and avoidance,'' {\em ACM Transactions on Knowledge
+  Discovery from Data}, vol.~6, no.~4, pp.~15:1--15:21, 2012.
+
+\bibitem{kaggle_kneemri}
+S.~Anwaar, ``{Knee MRI Dataset}.'' Kaggle, 2020.
+\newblock Derivado del conjunto de datos original de \v{S}tajduhar et al.
+
+\bibitem{harris2020numpy}
+C.~R. Harris, K.~J. Millman, S.~J. van~der Walt, {\em et~al.}, ``Array
+  programming with {NumPy},'' {\em Nature}, vol.~585, pp.~357--362, 2020.
+
+\bibitem{mckinney2010pandas}
+W.~McKinney, ``Data structures for statistical computing in {P}ython,'' in {\em
+  Proceedings of the 9th Python in Science Conference}, pp.~56--61, 2010.
+
+\bibitem{pedregosa2011sklearn}
+F.~Pedregosa, G.~Varoquaux, A.~Gramfort, V.~Michel, B.~Thirion, O.~Grisel,
+  M.~Blondel, P.~Prettenhofer, R.~Weiss, V.~Dubourg, J.~Vanderplas, A.~Passos,
+  D.~Cournapeau, M.~Brucher, M.~Perrot, and {\'E}.~Duchesnay, ``Scikit-learn:
+  Machine learning in {P}ython,'' {\em Journal of Machine Learning Research},
+  vol.~12, pp.~2825--2830, 2011.
+
+\bibitem{cookiecutter_ds}
+{DrivenData}, ``Cookiecutter data science.''
+  \url{https://cookiecutter-data-science.drivendata.org/}, 2024.
+\newblock Consultado en octubre de 2026.
+
+\bibitem{isensee2021nnunet}
+F.~Isensee, P.~F. Jaeger, S.~A.~A. Kohl, J.~Petersen, and K.~H. Maier-Hein,
+  ``{nnU-Net}: a self-configuring method for deep learning-based biomedical
+  image segmentation,'' {\em Nature Methods}, vol.~18, pp.~203--211, 2021.
+
+\bibitem{bien2018mrnet}
+N.~Bien, P.~Rajpurkar, R.~L. Ball, J.~Irvin, A.~Park, E.~Jones, M.~Bereket,
+  B.~N. Patel, K.~W. Yeom, K.~Shpanskaya, S.~Halabi, E.~Zucker, G.~Fanton,
+  D.~F. Amanatullah, C.~F. Beaulieu, G.~M. Riley, R.~J. Stewart, F.~G.
+  Blankenberg, D.~B. Larson, R.~H. Jones, C.~P. Langlotz, A.~Y. Ng, and M.~P.
+  Lungren, ``Deep-learning-assisted diagnosis for knee magnetic resonance
+  imaging: Development and retrospective validation of {MRNet},'' {\em PLoS
+  Medicine}, vol.~15, no.~11, p.~e1002699, 2018.
+
+\bibitem{he2016resnet}
+K.~He, X.~Zhang, S.~Ren, and J.~Sun, ``Deep residual learning for image
+  recognition,'' in {\em Proceedings of the IEEE Conference on Computer Vision
+  and Pattern Recognition (CVPR)}, pp.~770--778, 2016.
+
+\bibitem{lin2017focal}
+T.-Y. Lin, P.~Goyal, R.~Girshick, K.~He, and P.~Doll{\'a}r, ``Focal loss for
+  dense object detection,'' in {\em Proceedings of the IEEE International
+  Conference on Computer Vision (ICCV)}, pp.~2980--2988, 2017.
+
+\bibitem{chawla2002smote}
+N.~V. Chawla, K.~W. Bowyer, L.~O. Hall, and W.~P. Kegelmeyer, ``{SMOTE}:
+  Synthetic minority over-sampling technique,'' {\em Journal of Artificial
+  Intelligence Research}, vol.~16, pp.~321--357, 2002.
+
+\end{thebibliography}

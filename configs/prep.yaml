@@ -3,6 +3,13 @@ data:
   metadata_csv: datasets/raw/kneemridataset/metadata.csv
   volumes_dir: datasets/raw/volumetric_data
   interim_dir: datasets/interim
+  processed_dir: datasets/processed
+preprocess:
+  clip_low_pct: 0.5
+  clip_high_pct: 99.5
+  pad_height: 320
+  pad_width: 320
+  storage_dtype: float16
 split:
   n_test_splits: 6
   n_cv_folds: 5

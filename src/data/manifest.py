@@ -1,6 +1,6 @@
 from pathlib import Path
 import pandas as pd
-import pickle
+from src.data.io import load_volume
 
 def build_manifest(metadata_csv: str | Path, volumes_dir: str | Path) -> pd.DataFrame:
     """
@@ -32,17 +32,15 @@ def build_manifest(metadata_csv: str | Path, volumes_dir: str | Path) -> pd.Data
     for _, row in data.iterrows():
         if row['exists']:
             # Using raw_dir_path to get the absolute path to the file
-            file_path = raw_dir_path / row['path']
-            with open(file_path, "rb") as f:
-                arr = pickle.load(f)
-                d, h, w = arr.shape
-            
-                depths.append(d)
-                heights.append(h)
-                widths.append(w)
-                dtypes.append(str(arr.dtype))
-                mins.append(arr.min())
-                maxs.append(arr.max())
+            arr = load_volume(raw_dir_path / row['path'])
+            d, h, w = arr.shape
+
+            depths.append(d)
+            heights.append(h)
+            widths.append(w)
+            dtypes.append(str(arr.dtype))
+            mins.append(arr.min())
+            maxs.append(arr.max())
         else:
             depths.append(pd.NA)
             heights.append(pd.NA)
