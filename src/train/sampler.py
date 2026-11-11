@@ -5,13 +5,14 @@ import pandas as pd
 from torch.utils.data import Sampler
 
 
-def train_slices(slices: pd.DataFrame, val_fold: str) -> pd.DataFrame:
+def train_slices(slices: pd.DataFrame, val_fold: str | None) -> pd.DataFrame:
     """
     Return the slices used to train when val_fold is held out for validation.
 
     Args:
         slices: Slice index with at least the columns 'examId' and 'split'.
-        val_fold: Name of the validation fold, e.g. 'fold_0'.
+        val_fold: Name of the validation fold, e.g. 'fold_0', or None to train
+            on the whole development set (every fold).
 
     Returns:
         The slices whose split is neither val_fold nor 'test', with a fresh
@@ -22,10 +23,10 @@ def train_slices(slices: pd.DataFrame, val_fold: str) -> pd.DataFrame:
             both in training and in the excluded slices.
     """
 
-    if val_fold not in set(slices['split']):
+    if val_fold is not None and val_fold not in set(slices['split']):
         raise ValueError(f"Unknown val_fold {val_fold!r}. Available splits: {sorted(slices['split'].unique())}")
 
-    excluded = slices['split'].isin([val_fold, 'test'])
+    excluded = slices['split'].isin(['test'] if val_fold is None else [val_fold, 'test'])
 
     leaked = set(slices.loc[~excluded, 'examId']) & set(slices.loc[excluded, 'examId'])
     if leaked:
@@ -163,12 +164,13 @@ class EpochSampler(Sampler[int]):
     def set_epoch(self, epoch: int) -> None:
         self.epoch = epoch
 
-    def _sample(self) -> np.ndarray:
+    def sample(self) -> np.ndarray:
+        """Return the positions drawn for the current epoch, e.g. to compute pos_weight."""
         rng = np.random.default_rng([self.seed, self.epoch])
         return epoch_sample(self.slices, rng, self.weights, **self.kwargs)
 
     def __iter__(self) -> Iterator[int]:
-        return iter(self._sample().tolist())
+        return iter(self.sample().tolist())
 
     def __len__(self) -> int:
-        return len(self._sample())
+        return len(self.sample())

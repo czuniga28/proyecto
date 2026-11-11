@@ -1,0 +1,30 @@
+seed: 42
+data:
+  interim_dir: datasets/interim
+  processed_dir: datasets/processed
+  # Size of the padded slices on disk (prep.yaml: pad_width, pad_height)
+  width: 320
+  height: 320
+val_fold: fold_0
+
+image_size: 224
+batch_size: 32
+num_workers: 0
+max_shift: 20
+
+sampler:
+  neg_per_pos: 1.0
+  hard_frac: 0.5
+  hard_dist: 2
+
+model:
+  pretrained: true  # IMAGENET1K_V1
+  dropout: 0.2
+
+# Written as decimals: PyYAML reads 3e-4 as a string
+lr: 0.0003
+weight_decay: 0.0001
+epochs: 20
+patience: 5
+box_weight: 1.0
+taus: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]

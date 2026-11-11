@@ -39,6 +39,13 @@ def test_train_slices_excludes_validation_and_test(slices, train):
     assert len(train) == len(slices[~slices['split'].isin(['fold_0', 'test'])])
 
 
+def test_train_slices_without_val_fold_excludes_only_test(slices):
+    dev = train_slices(slices, None)
+    assert set(dev['split']) == {f'fold_{k}' for k in range(5)}
+    assert dev.index.tolist() == list(range(len(dev)))
+    assert len(dev) == (slices['split'] != 'test').sum()
+
+
 def test_train_slices_rejects_exam_on_both_sides(slices):
     shared_exam = slices.loc[slices['split'] == 'fold_0', 'examId'].iloc[0]
     slices.loc[slices['split'] == 'fold_1', 'examId'] = shared_exam

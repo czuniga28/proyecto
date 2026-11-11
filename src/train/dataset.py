@@ -119,8 +119,8 @@ class SliceDataset(Dataset):
         processed_dir: Directory that the 'volume_file' column is relative to.
         size: Side of the square image returned.
         augment: Whether to apply the augmentations below.
-        hflip_p: Probability of a horizontal flip. In a sagittal slice it swaps
-            anterior and posterior, so it stays off until checked against kneeLR.
+        hflip_p: Probability of a horizontal flip. Left at 0: orientation is
+            consistent (anterior on the left), checked in the kneeLR figure.
         max_shift: Largest translation per axis, in pixels of the original image.
     """
 
