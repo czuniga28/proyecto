@@ -4,6 +4,7 @@ import random
 import subprocess
 import sys
 import time
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -19,6 +20,7 @@ from src.eval.metrics import (
     iou_3d,
     roi_to_box3d,
     slice_classification_metrics,
+    summarize_iou,
 )
 from src.models.net import SliceNet
 from src.train.dataset import SliceDataset, denormalize_boxes
@@ -36,6 +38,10 @@ def set_seed(seed: int) -> None:
     torch.manual_seed(seed)
     # warn_only: some MPS/CPU ops have no deterministic version and would raise
     torch.use_deterministic_algorithms(True, warn_only=True)
+    # MPS has no deterministic index_put (backward of out['box'][mask]); it warns on
+    # every step. Runs are therefore not bit-identical on MPS: reproducibility is
+    # checked as |delta IoU| < 0.01 instead
+    warnings.filterwarnings('ignore', message='index_put_with_accumulate_mps')
 
 
 def get_device(name: str | None = None) -> torch.device:
@@ -169,8 +175,9 @@ def evaluate(
         tau: Fixed threshold, e.g. the one chosen on validation when scoring test.
 
     Returns:
-        Dict with 'tau', mean 'iou', 'auprc', 'f1' and 'ious', an array with
-        one IoU per row of gt, in gt's order.
+        Dict with 'tau', mean 'iou', 'auprc', 'f1', 'ious' (an array with one
+        IoU per row of gt, in gt's order) and 'iou_class_<c>', the mean IoU of
+        each aclDiagnosis present in gt.
     """
     if tau is None:
         tau, _ = select_tau(preds, gt, taus)
@@ -183,8 +190,12 @@ def evaluate(
         raise ValueError("some ground-truth volumes have no predictions")
     ious = iou_3d(m[BOX3D_COLUMNS].to_numpy(), m[[f'{c}_gt' for c in BOX3D_COLUMNS]].to_numpy())
 
+    # Per class: the global mean can hide a failure on the ~6 % of ruptures
+    summary = summarize_iou(ious, gt['aclDiagnosis'].to_numpy())
+    by_class = {f'iou_class_{c}': float(summary.loc[c, 'mean']) for c in summary.index if c != 'all'}
+
     cls = slice_classification_metrics(preds['contains_acl'], preds['p'])
-    return {'tau': float(tau), 'iou': float(ious.mean()), **cls, 'ious': ious}
+    return {'tau': float(tau), 'iou': float(ious.mean()), **by_class, **cls, 'ious': ious}
 
 
 def _subsample(
@@ -216,8 +227,9 @@ def run(
     """
     Train on every development fold but cfg['val_fold'] and validate on it.
 
-    Writes to out_dir: history.csv (one row per epoch), best.pt and
-    preds_val.csv (from the epoch with the best val IoU) and metrics.json.
+    Writes to out_dir: history.csv (one row per epoch); best.pt, preds_val.csv
+    and val_volumes.csv (one IoU per volume), all from the epoch with the best
+    val IoU; and metrics.json.
     Provenance is left to the caller (write_provenance).
 
     Args:
@@ -229,8 +241,9 @@ def run(
         device: Device name, or None to pick MPS when available.
 
     Returns:
-        Dict with best_epoch, tau, iou, auprc, f1 (all from the best epoch),
-        pos_weight and seconds_per_epoch.
+        Dict with best_epoch, tau, iou, iou_class_<c> for each class in
+        validation, auprc, f1 (all from the best epoch), pos_weight and
+        seconds_per_epoch.
 
     Raises:
         optuna.TrialPruned: If trial says the run should be pruned.
@@ -278,21 +291,25 @@ def run(
         result = evaluate(preds, gt, np.asarray(cfg['taus']))
         seconds = time.perf_counter() - start
 
+        scores = {k: v for k, v in result.items() if k != 'ious'}
         history.append({
             'epoch': epoch, 'lr': lr,
             'train_cls': losses['cls'], 'train_box': losses['box'],
-            **{f'val_{k}': result[k] for k in ('iou', 'tau', 'auprc', 'f1')},
+            **{f'val_{k}': v for k, v in scores.items()},
             'seconds': seconds,
         })
         pd.DataFrame(history).to_csv(out_dir / 'history.csv', index=False)
 
         if best is None or result['iou'] > best['iou']:
-            best = {'best_epoch': epoch, **{k: result[k] for k in ('tau', 'iou', 'auprc', 'f1')}}
+            best = {'best_epoch': epoch, **scores}
             torch.save(
                 {'model': model.state_dict(), 'epoch': epoch, 'tau': result['tau'], 'cfg': cfg},
                 out_dir / 'best.pt',
             )
             preds.to_csv(out_dir / 'preds_val.csv', index=False)
+            gt[KEY + ['aclDiagnosis']].assign(iou=result['ious']).to_csv(
+                out_dir / 'val_volumes.csv', index=False,
+            )
             bad_epochs = 0
         else:
             bad_epochs += 1

@@ -135,6 +135,7 @@ def test_evaluate_perfect_predictions():
 
     assert result['iou'] == pytest.approx(1.0)
     assert result['ious'] == pytest.approx([1.0, 1.0])
+    assert all(v == pytest.approx(1.0) for k, v in result.items() if k.startswith('iou_class_'))
     assert result['auprc'] == pytest.approx(1.0)
     assert result['f1'] == pytest.approx(1.0)
     assert result['tau'] in TAUS
@@ -166,13 +167,18 @@ def test_run_smoke_writes_outputs(run_cfg, tmp_path):
     out = tmp_path / 'run'
     metrics = run(run_cfg, out, max_slices=16, device='cpu')
 
-    assert set(metrics) == {'best_epoch', 'tau', 'iou', 'auprc', 'f1', 'pos_weight', 'seconds_per_epoch'}
+    base = {'best_epoch', 'tau', 'iou', 'auprc', 'f1', 'pos_weight', 'seconds_per_epoch'}
+    assert base <= set(metrics)
+    assert all(k.startswith('iou_class_') for k in set(metrics) - base)
     assert json.loads((out / 'metrics.json').read_text()) == pytest.approx(metrics)
     assert pd.read_csv(out / 'history.csv')['epoch'].tolist() == [0, 1]
 
     checkpoint = torch.load(out / 'best.pt', weights_only=False)
     assert checkpoint['epoch'] == metrics['best_epoch']
     assert checkpoint['tau'] == metrics['tau']
+
+    volumes = pd.read_csv(out / 'val_volumes.csv')
+    assert volumes['iou'].mean() == pytest.approx(metrics['iou'])
 
     # Smoke test validates on 2 whole volumes of val_fold only
     preds = pd.read_csv(out / 'preds_val.csv')
