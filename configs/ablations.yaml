@@ -1,0 +1,38 @@
+# One-factor-at-a-time ablations on fold_0, each from configs/train/m1.yaml.
+# Keys are dotted paths into that config; a key that does not exist there is an
+# error, so a typo fails before hours of training instead of being ignored.
+#
+# Ordered by priority: scripts/ablate.py skips finished variants, so the run can
+# be stopped and resumed, and cutting the list from the bottom loses the least.
+# Rough cost on MPS: ~20 min per variant; size_320 and neg_2 about twice that.
+
+# Training noise: same config, three seeds. Their spread (sigma) is the yardstick
+# for every other row: a difference under 2 sigma is not evidence.
+base: {}
+seed_0: {seed: 0}
+seed_1: {seed: 1}
+
+# E3: does the z context of the 2.5D input help?
+ctx_2d: {context: 0}            # central slice repeated: 2D with the same input shape
+
+# E4: does ImageNet pretraining help on MRI?
+scratch: {model.pretrained: false}
+
+# E5: diagnosis weighting of the sampler (judge mainly by iou_class_2)
+weights_none: {sampler.weight_power: 0.0}
+weights_inv: {sampler.weight_power: 1.0}
+
+# E6: box loss terms
+box_l1: {box_terms: [l1]}
+box_giou: {box_terms: [giou]}
+
+# E9: more negatives per positive
+neg_2: {sampler.neg_per_pos: 2.0}
+
+# E7: input resolution (320 is the native size, no downsampling)
+size_160: {image_size: 160}
+size_320: {image_size: 320}
+
+# Optional, lowest priority
+ctx_2: {context: 2}             # wider z context: s-2, s, s+2
+resnet34: {model.arch: resnet34}  # E10: deeper backbone

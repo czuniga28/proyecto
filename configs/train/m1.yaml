@@ -11,15 +11,20 @@ image_size: 224
 batch_size: 32
 num_workers: 0
 max_shift: 20
+# Distance to the neighbouring slices in the 2.5D input (ablation E3: 0 = 2D, 2)
+context: 1
 
 sampler:
   neg_per_pos: 1.0
   hard_frac: 0.5
   hard_dist: 2
+  # Diagnosis weights = freq ** -weight_power (ablation E5: 0 = none, 1 = 1/freq)
+  weight_power: 0.5
 
 model:
   pretrained: true  # IMAGENET1K_V1
   dropout: 0.2
+  arch: resnet18  # ablation E10: resnet34
 
 # Written as decimals: PyYAML reads 3e-4 as a string
 lr: 0.0003
@@ -27,4 +32,10 @@ weight_decay: 0.0001
 epochs: 20
 patience: 5
 box_weight: 1.0
+# Box losses on positives (ablation E6: [l1] or [giou])
+box_terms: [l1, giou]
 taus: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+# Slices -> 3D box (ablations E1, E2: scripts/aggregation_ablation.py)
+aggregation:
+  z_method: kadane
+  xy_method: wmedian

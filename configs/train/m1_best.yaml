@@ -1,0 +1,42 @@
+seed: 42
+data:
+  interim_dir: datasets/interim
+  processed_dir: datasets/processed
+  width: 320
+  height: 320
+val_fold: fold_0
+image_size: 224
+batch_size: 32
+num_workers: 0
+max_shift: 10
+context: 1
+sampler:
+  neg_per_pos: 1.0
+  hard_frac: 0.6007939647290891
+  hard_dist: 2
+  weight_power: 0.5
+model:
+  pretrained: true
+  dropout: 0.030336156058721406
+  arch: resnet18
+lr: 0.00032533404158923746
+weight_decay: 0.00023086864538921553
+epochs: 15
+patience: 3
+box_weight: 3.6290043666639806
+box_terms:
+- l1
+- giou
+taus:
+- 0.1
+- 0.2
+- 0.3
+- 0.4
+- 0.5
+- 0.6
+- 0.7
+- 0.8
+- 0.9
+aggregation:
+  z_method: kadane
+  xy_method: wmedian

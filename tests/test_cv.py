@@ -114,20 +114,60 @@ def test_summarize_cv_rejects_volume_without_m0():
 def test_refit_params_uses_medians():
     folds_df = pd.DataFrame({
         'run': list('abcd'), 'fold': 'fold_0', 'seed': [1, 2, 3, 4],
-        'best_epoch': [3, 4, 6, 9], 'tau': [0.3, 0.4, 0.5, 0.5],
+        'best_epoch': [3, 4, 6, 9], 'tau': [0.3, 0.4, 0.5, 0.9],
     })
-    params = cv.refit_params(folds_df)
+    params = cv.refit_params(folds_df, {1: 0.3, 2: 0.5})
 
     # best_epoch is 0-based: epochs trained are 4, 5, 7, 10 -> median 6
-    assert params['epochs'] == 6
-    assert params['tau'] == pytest.approx(0.45)
+    assert params['refit_epochs'] == 6
+    # tau comes from the pooled per-seed taus; the per-run median is only reported
+    assert params['tau'] == pytest.approx(0.4)
+    assert params['tau_run_median'] == pytest.approx(0.45)
     assert [r['best_epoch'] for r in params['runs']] == [3, 4, 6, 9]
 
 
 def test_refit_params_rounds_up():
     folds_df = pd.DataFrame({'run': list('ab'), 'fold': 'f', 'seed': [1, 2],
                              'best_epoch': [3, 4], 'tau': [0.5, 0.5]})
-    assert cv.refit_params(folds_df)['epochs'] == 5  # median(4, 5) = 4.5
+    assert cv.refit_params(folds_df, {1: 0.5})['refit_epochs'] == 5  # median(4, 5) = 4.5
+
+
+DEPTH = 6
+ROI_Z = (2, 4)  # Slices 2 and 3 contain the ROI
+
+
+def write_preds(run_dir, exams, p_roi, p_near):
+    """preds_val.csv with exact boxes; p_roi on the ROI slices, p_near on slices 1 and 4."""
+    rows = []
+    for exam in exams:
+        for z in range(DEPTH):
+            inside = ROI_Z[0] <= z < ROI_Z[1]
+            p = p_roi if inside else p_near if z in (1, 4) else 0.0
+            rows.append([exam, 5, z, 0, inside, p, 10, 20, 40, 60])
+    run_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows, columns=KEY + ['slice_idx', 'aclDiagnosis', 'contains_acl', 'p',
+                                      'px0', 'py0', 'px1', 'py1']).to_csv(run_dir / 'preds_val.csv', index=False)
+
+
+def test_pooled_taus_one_tau_per_seed_over_all_folds(tmp_path):
+    # Seed 42: neighbours at 0.45, so only tau >= 0.5 isolates the ROI.
+    # Seed 0: ROI at 0.6, neighbours at 0.2, so 0.3 already isolates it (ties keep the first)
+    write_preds(tmp_path / 'fold_0_s42', [1, 2], p_roi=0.9, p_near=0.45)
+    write_preds(tmp_path / 'fold_1_s42', [3], p_roi=0.9, p_near=0.45)
+    write_preds(tmp_path / 'fold_0_s0', [1, 2], p_roi=0.6, p_near=0.2)
+    write_preds(tmp_path / 'fold_1_s0', [3], p_roi=0.6, p_near=0.2)
+    folds_df = pd.DataFrame({'run': ['fold_0_s42', 'fold_1_s42', 'fold_0_s0', 'fold_1_s0'],
+                             'fold': ['fold_0', 'fold_1'] * 2, 'seed': [42, 42, 0, 0]})
+    gt = pd.DataFrame({'examId': [1, 2, 3, 4], 'seriesNo': 5, 'aclDiagnosis': 0,
+                       'x0': 10.0, 'y0': 20.0, 'z0': 2.0, 'x1': 40.0, 'y1': 60.0, 'z1': 4.0})
+    cfg = {'taus': [0.3, 0.5, 0.7], 'aggregation': {'z_method': 'kadane', 'xy_method': 'wmedian'}}
+
+    taus, curves = cv.pooled_taus(folds_df, tmp_path, gt, cfg)
+
+    assert taus == {42: 0.5, 0: 0.3}
+    assert curves.columns.tolist() == ['seed', 'tau', 'mean_iou']
+    assert len(curves) == 2 * 3
+    assert curves.query('seed == 42 and tau == 0.5')['mean_iou'].item() == pytest.approx(1.0)
 
 
 @pytest.fixture
@@ -143,7 +183,7 @@ def cv_setup(run_cfg, tmp_path, monkeypatch):
         reports / 'baseline_cv_volumes.csv', index=False,
     )
 
-    config = tmp_path / 'm1_best.yaml'
+    config = tmp_path / 'm1.yaml'
     config.write_text(yaml.safe_dump({**run_cfg, 'epochs': 1}))
     argv = ['cv', '--config', str(config), '--folds', 'fold_0', 'fold_1', '--seeds', '0', '1',
             '--device', 'cpu']
@@ -165,10 +205,15 @@ def test_main_writes_reports_and_refit_config(cv_setup, capsys):
 
     text = (cv_setup / 'm1_refit.yaml').read_text()
     refit = yaml.safe_load(text)
-    assert refit['epochs'] == 1
+    assert refit['epochs'] == 1  # The schedule length is kept from the CV config
+    assert refit['refit_epochs'] == 1
+    assert list(refit).index('refit_epochs') == list(refit).index('epochs') + 1
     assert refit['val_fold'] is None
-    assert 0.3 <= refit['tau'] <= 0.7  # Median of taus drawn from run_cfg['taus']
-    assert '# median of the tau' in text
+    assert 0.3 <= refit['tau'] <= 0.7  # Median of per-seed taus from run_cfg['taus']
+    assert '# Median over seeds of select_tau' in text
+    assert '# Stop here' in text
+    curves = pd.read_csv(reports / 'cv_tau_curves.csv')
+    assert set(curves['seed']) == {0, 1}
     assert '=== fold_1_s1' in capsys.readouterr().out
 
 
@@ -180,9 +225,3 @@ def test_main_resumes_without_retraining(cv_setup, monkeypatch):
 
     monkeypatch.setattr(ablate, 'run', fail)
     cv.main()
-
-
-def test_main_without_config_points_to_tune(cv_setup, monkeypatch):
-    monkeypatch.setattr(sys, 'argv', ['cv', '--config', str(cv_setup / 'missing.yaml')])
-    with pytest.raises(FileNotFoundError, match='scripts.tune'):
-        cv.main()
