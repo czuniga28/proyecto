@@ -2,6 +2,8 @@ import math
 
 import pytest
 import torch
+import torch.nn.functional as F
+from torchvision.ops import generalized_box_iou_loss
 
 from src.models.net import SliceNet
 from src.train.losses import detection_loss
@@ -76,3 +78,23 @@ def test_gradient_reaches_every_part():
     }
     for name, p in params.items():
         assert p.grad is not None and p.grad.abs().sum() > 0, name
+
+
+def test_box_terms_select_each_loss():
+    batch = make_batch([True, False])
+    pred = [[0.1, 0.2, 0.5, 0.9], [0.0, 0.0, 0.1, 0.1]]
+    l1 = F.l1_loss(torch.tensor(pred[:1]), torch.tensor([GT_BOX])).item()
+    giou = generalized_box_iou_loss(torch.tensor(pred[:1]), torch.tensor([GT_BOX]), reduction='mean').item()
+
+    def box(terms):
+        return detection_loss(make_out([0.0, 0.0], pred), batch, 1.0, box_terms=terms)[1]['box']
+
+    assert box(('l1',)) == pytest.approx(l1)
+    assert box(('giou',)) == pytest.approx(giou)
+    assert box(('l1', 'giou')) == pytest.approx(l1 + giou)
+
+
+@pytest.mark.parametrize('terms', [(), ('l2',)])
+def test_box_terms_rejects_unknown_or_empty(terms):
+    with pytest.raises(ValueError, match='box_terms'):
+        detection_loss(make_out([0.0], [GT_BOX]), make_batch([True]), 1.0, box_terms=terms)

@@ -8,6 +8,21 @@ from sklearn.metrics import average_precision_score, f1_score
 BOX3D_COLUMNS = ['x0', 'y0', 'z0', 'x1', 'y1', 'z1']
 
 
+def iou_1d(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """
+    IoU between intervals (start, end), vectorized over leading dimensions.
+
+    Used for the z extent of 3D boxes, to tell slice-range errors from in-plane ones.
+
+    Args:
+        a, b: Arrays of shape (..., 2), broadcastable against each other.
+
+    Returns:
+        Array of shape (...,) with values in [0, 1]. Two empty intervals give 0.
+    """
+    return _iou(np.asarray(a, dtype=float), np.asarray(b, dtype=float), ndim=1)
+
+
 def iou_2d(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """
     IoU between 2D boxes (x0, y0, x1, y1), vectorized over leading dimensions.

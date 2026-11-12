@@ -1,6 +1,12 @@
 import torch
 from torch import Tensor, nn
-from torchvision.models import ResNet18_Weights, resnet18
+from torchvision.models import ResNet18_Weights, ResNet34_Weights, resnet18, resnet34
+
+# Both end in 512 features, so the heads do not change with the backbone
+BACKBONES = {
+    'resnet18': (resnet18, ResNet18_Weights.IMAGENET1K_V1),
+    'resnet34': (resnet34, ResNet34_Weights.IMAGENET1K_V1),
+}
 
 
 def cxcywh_to_xyxy(boxes: Tensor) -> Tensor:
@@ -21,7 +27,7 @@ def cxcywh_to_xyxy(boxes: Tensor) -> Tensor:
 
 class SliceNet(nn.Module):
     """
-    ResNet-18 with two heads: whether the slice contains the ACL, and its box.
+    ResNet with two heads: whether the slice contains the ACL, and its box.
 
     The input is not normalized with ImageNet statistics: its channels are
     neighbouring slices, already z-scored per volume, not RGB.
@@ -29,12 +35,15 @@ class SliceNet(nn.Module):
     Args:
         pretrained: Whether to start from the IMAGENET1K_V1 weights.
         dropout: Dropout probability before each head.
+        arch: Backbone, a key of BACKBONES.
     """
 
-    def __init__(self, pretrained: bool = True, dropout: float = 0.2) -> None:
+    def __init__(self, pretrained: bool = True, dropout: float = 0.2, arch: str = 'resnet18') -> None:
         super().__init__()
-        weights = ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
-        self.backbone = resnet18(weights=weights)
+        if arch not in BACKBONES:
+            raise ValueError(f"Unknown arch {arch!r}. Valid: {sorted(BACKBONES)}")
+        build, imagenet = BACKBONES[arch]
+        self.backbone = build(weights=imagenet if pretrained else None)
         in_features = self.backbone.fc.in_features
         self.backbone.fc = nn.Identity()
 

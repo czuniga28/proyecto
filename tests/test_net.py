@@ -39,3 +39,16 @@ def test_boxes_are_valid(net):
 def test_backbone_outputs_features(net):
     with torch.no_grad():
         assert net.backbone(torch.randn(2, 3, 224, 224)).shape == (2, 512)
+
+
+def test_resnet34_backbone_keeps_the_output_shapes():
+    net = SliceNet(pretrained=False, arch='resnet34').eval()
+    with torch.no_grad():
+        out = net(torch.randn(2, 3, 64, 64))
+    assert out['logit'].shape == (2,)
+    assert out['box'].shape == (2, 4)
+
+
+def test_unknown_arch_raises():
+    with pytest.raises(ValueError, match='arch'):
+        SliceNet(pretrained=False, arch='vgg')

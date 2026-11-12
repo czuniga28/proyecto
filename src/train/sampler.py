@@ -35,22 +35,24 @@ def train_slices(slices: pd.DataFrame, val_fold: str | None) -> pd.DataFrame:
     return slices[~excluded].reset_index(drop=True)
 
 
-def diagnosis_weights(slices: pd.DataFrame) -> dict[int, float]:
+def diagnosis_weights(slices: pd.DataFrame, power: float = 0.5) -> dict[int, float]:
     """
     Compute a weight per aclDiagnosis from its frequency in volumes, not slices.
 
     Args:
         slices: Slice index with at least the columns 'examId', 'seriesNo' and
             'aclDiagnosis'.
+        power: Exponent of the inverse frequency. 0.5 (default) gives
+            1 / sqrt(freq); 0 weights every diagnosis equally; 1 gives 1 / freq.
 
     Returns:
-        A dict mapping each diagnosis to 1 / sqrt(freq), scaled so that the most
+        A dict mapping each diagnosis to freq ** -power, scaled so that the most
         frequent diagnosis has weight 1.
     """
     volumes = slices.drop_duplicates(['examId', 'seriesNo'])
     freq = volumes['aclDiagnosis'].value_counts(normalize=True)
 
-    weights = 1 / np.sqrt(freq)
+    weights = freq ** -power
     weights = weights / weights.min()
 
     return {int(diagnosis): float(weight) for diagnosis, weight in weights.items()}
@@ -150,15 +152,16 @@ class EpochSampler(Sampler[int]):
     Args:
         slices: Training slices, as returned by train_slices.
         seed: Base seed of the sampler.
+        weight_power: Passed to diagnosis_weights as power.
         **kwargs: neg_per_pos, hard_frac and hard_dist, passed to epoch_sample.
     """
 
-    def __init__(self, slices: pd.DataFrame, seed: int, **kwargs) -> None:
+    def __init__(self, slices: pd.DataFrame, seed: int, weight_power: float = 0.5, **kwargs) -> None:
         super().__init__()
         self.slices = slices
         self.seed = seed
         self.kwargs = kwargs
-        self.weights = diagnosis_weights(slices)
+        self.weights = diagnosis_weights(slices, weight_power)
         self.epoch = 0
 
     def set_epoch(self, epoch: int) -> None:

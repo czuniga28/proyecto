@@ -1,7 +1,6 @@
 import argparse
 import copy
 from pathlib import Path
-from optuna.study import MaxTrialsCallback
 
 import matplotlib
 
@@ -9,6 +8,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import optuna
 import yaml
+from optuna.study import MaxTrialsCallback
 from optuna.trial import TrialState
 
 from src.train.loop import PROJECT_ROOT, run, write_provenance
@@ -29,7 +29,10 @@ def suggest(trial: optuna.Trial, base_cfg: dict) -> dict:
     cfg['box_weight'] = trial.suggest_float('box_weight', 0.5, 5.0, log=True)
     cfg['max_shift'] = trial.suggest_categorical('max_shift', [0, 10, 20, 30])
     cfg['sampler']['hard_frac'] = trial.suggest_float('hard_frac', 0.25, 0.75)
-    # Shorter than a final run so 20 trials fit; the pruner cuts the bad ones earlier
+    cfg['sampler']['hard_dist'] = trial.suggest_int('hard_dist', 1, 4)
+    # Shorter than a final run so 20 trials fit; the pruner cuts the bad ones earlier.
+    # Kept in m1_best.yaml on purpose: CosineAnnealingLR uses T_max = epochs, so
+    # the CV must run the same schedule the best trial was chosen with
     cfg['epochs'] = 15
     cfg['patience'] = 3
     return cfg
@@ -70,11 +73,13 @@ def main() -> None:
         study_name=STUDY_NAME,
         load_if_exists=True,
     )
-    study.optimize(lambda t: objective(t, base_cfg, args.device),
-    timeout=args.timeout,
-    callbacks=[MaxTrialsCallback(args.n_trials,
-                                states=(TrialState.COMPLETE,
-                                TrialState.PRUNED))],)
+    # n_trials is a total across restarts: optimize's own n_trials would add that
+    # many more every time the study is resumed from m1.db
+    study.optimize(
+        lambda t: objective(t, base_cfg, args.device),
+        timeout=args.timeout,
+        callbacks=[MaxTrialsCallback(args.n_trials, states=(TrialState.COMPLETE, TrialState.PRUNED))],
+    )
 
     TRIALS_CSV.parent.mkdir(parents=True, exist_ok=True)
     study.trials_dataframe().to_csv(TRIALS_CSV, index=False)

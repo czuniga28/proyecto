@@ -165,3 +165,18 @@ def test_sampler_forwards_kwargs_and_reports_its_length(train):
 
     assert len(sampler) == len(list(sampler)) == 3 * n_pos
     assert all(type(position) is int for position in sampler)
+
+
+@pytest.mark.parametrize('power, expected', [(0.0, {0: 1.0, 1: 1.0, 2: 1.0}), (1.0, {0: 1.0, 1: 4.0, 2: 12.5})])
+def test_diagnosis_weights_power(power, expected):
+    labels = [0] * 575 + [1] * 143 + [2] * 46
+    slices = pd.DataFrame({'examId': range(len(labels)), 'seriesNo': 5, 'aclDiagnosis': labels})
+
+    assert diagnosis_weights(slices, power) == pytest.approx(expected, rel=0.01)
+
+
+def test_sampler_forwards_weight_power(train):
+    assert EpochSampler(train, seed=7, weight_power=0.0).weights == pytest.approx(
+        {int(d): 1.0 for d in train['aclDiagnosis'].unique()},
+    )
+    assert EpochSampler(train, seed=7).weights == diagnosis_weights(train)

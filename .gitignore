@@ -5,3 +5,5 @@ __pycache__/
 .ipynb_checkpoints/
 datasets/
 .pytest_cache/
+# Checkpoints and per-run outputs (~45 MB each); summaries go to reports/
+runs/

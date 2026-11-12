@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from src.eval.metrics import (
+    iou_1d,
     iou_2d, iou_3d, roi_to_box3d, slice_classification_metrics, summarize_iou,
 )
 
@@ -78,3 +79,9 @@ def test_slice_classification_metrics():
     # Predicting "no ACL" everywhere: F1 is 0, which accuracy (50 %) would hide
     none = slice_classification_metrics(y, np.zeros(4))
     assert none['f1'] == 0.0
+
+
+def test_iou_1d_by_hand_disjoint_and_vectorized():
+    assert iou_1d(np.array([2, 6]), np.array([4, 8])) == pytest.approx(2 / 6)
+    assert iou_1d(np.array([0, 2]), np.array([2, 4])) == 0
+    assert iou_1d(np.array([[0, 4], [0, 4]]), np.array([[0, 4], [0, 2]])).tolist() == [1.0, 0.5]

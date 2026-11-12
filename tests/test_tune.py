@@ -8,7 +8,7 @@ import yaml
 from scripts import tune
 
 PARAMS = {'lr': 3e-4, 'weight_decay': 1e-4, 'dropout': 0.1, 'box_weight': 2.0,
-          'max_shift': 10, 'hard_frac': 0.6}
+          'max_shift': 10, 'hard_frac': 0.6, 'hard_dist': 3}
 
 
 def test_suggest_applies_params_without_touching_base(run_cfg):
@@ -20,6 +20,7 @@ def test_suggest_applies_params_without_touching_base(run_cfg):
     assert cfg['model']['dropout'] == 0.1
     assert cfg['max_shift'] == 10
     assert cfg['sampler']['hard_frac'] == 0.6
+    assert cfg['sampler']['hard_dist'] == 3
     assert (cfg['epochs'], cfg['patience']) == (15, 3)
 
 

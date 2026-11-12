@@ -255,3 +255,25 @@ def test_write_provenance_hashes_data(run_cfg, tmp_path):
     assert set(hashes) == {'slices.csv', 'splits.csv', 'manifest.csv'}
     assert yaml.safe_load((out / 'config.yaml').read_text()) == run_cfg
     assert 'commit:' in (out / 'env.txt').read_text()
+
+
+def test_run_accepts_every_ablation_option(run_cfg, tmp_path):
+    run_cfg.update(context=0, box_terms=['l1'], aggregation={'z_method': 'threshold', 'xy_method': 'wmean'})
+    run_cfg['sampler']['weight_power'] = 0.0
+    run_cfg['model']['arch'] = 'resnet34'
+
+    metrics = run(run_cfg, tmp_path / 'run', max_slices=16, device='cpu')
+
+    assert math.isfinite(metrics['iou'])
+
+
+def test_evaluate_passes_the_aggregation_methods():
+    volumes = make_volumes()
+    preds = perfect_preds(volumes)
+    # A stray positive far below the ROI of exam 1: only threshold_span reaches it
+    preds.loc[(preds['examId'] == 1) & (preds['slice_idx'] == DEPTH - 1), 'p'] = 0.9
+
+    kadane = evaluate(preds, volume_boxes(volumes), TAUS, tau=0.5)
+    threshold = evaluate(preds, volume_boxes(volumes), TAUS, tau=0.5, z_method='threshold')
+
+    assert kadane['ious'][0] > threshold['ious'][0]

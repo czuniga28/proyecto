@@ -93,9 +93,10 @@ def train_one_epoch(
     pos_weight: float,
     box_weight: float,
     device: torch.device,
+    box_terms: tuple[str, ...] = ('l1', 'giou'),
 ) -> dict[str, float]:
     """
-    Run one pass over loader, updating model.
+    Run one pass over loader, updating model. box_terms is passed to detection_loss.
 
     Returns:
         Mean 'cls' and 'box' loss over the epoch, each batch weighted by its size.
@@ -106,7 +107,7 @@ def train_one_epoch(
     for batch in loader:
         batch = _to_device(batch, device)
         out = model(batch['image'])
-        loss, parts = detection_loss(out, batch, pos_weight, box_weight)
+        loss, parts = detection_loss(out, batch, pos_weight, box_weight, box_terms)
 
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
@@ -164,6 +165,8 @@ def evaluate(
     gt: pd.DataFrame,
     taus: np.ndarray,
     tau: float | None = None,
+    z_method: str = 'kadane',
+    xy_method: str = 'wmedian',
 ) -> dict:
     """
     Volume-level IoU and slice-level classification metrics.
@@ -173,6 +176,7 @@ def evaluate(
         gt: Output of volume_boxes for the volumes of that split.
         taus: Candidate thresholds, used only when tau is None.
         tau: Fixed threshold, e.g. the one chosen on validation when scoring test.
+        z_method, xy_method: Aggregation rules, see src/eval/aggregate.py.
 
     Returns:
         Dict with 'tau', mean 'iou', 'auprc', 'f1', 'ious' (an array with one
@@ -180,9 +184,9 @@ def evaluate(
         each aclDiagnosis present in gt.
     """
     if tau is None:
-        tau, _ = select_tau(preds, gt, taus)
+        tau, _ = select_tau(preds, gt, taus, z_method, xy_method)
 
-    pred_boxes = aggregate_predictions(preds, tau)
+    pred_boxes = aggregate_predictions(preds, tau, z_method, xy_method)
     m = gt[KEY + BOX3D_COLUMNS].merge(
         pred_boxes, on=KEY, how='left', suffixes=('_gt', ''), validate='one_to_one',
     )
@@ -266,8 +270,14 @@ def run(
 
     processed_dir = PROJECT_ROOT / cfg['data']['processed_dir']
     size = cfg['image_size']
-    train_ds = SliceDataset(train, processed_dir, size=size, augment=True, max_shift=cfg['max_shift'])
-    val_ds = SliceDataset(val, processed_dir, size=size)
+    # .get: keys added for the ablations; their defaults reproduce the earlier runs
+    context = cfg.get('context', 1)
+    box_terms = tuple(cfg.get('box_terms', ('l1', 'giou')))
+    aggregation = cfg.get('aggregation', {})
+    train_ds = SliceDataset(
+        train, processed_dir, size=size, augment=True, max_shift=cfg['max_shift'], context=context,
+    )
+    val_ds = SliceDataset(val, processed_dir, size=size, context=context)
     sampler = EpochSampler(train, cfg['seed'], **cfg['sampler'])
     loader_kwargs = {'batch_size': cfg['batch_size'], 'num_workers': cfg['num_workers']}
     train_loader = DataLoader(train_ds, sampler=sampler, **loader_kwargs)
@@ -284,11 +294,11 @@ def run(
         start = time.perf_counter()
         sampler.set_epoch(epoch)
         lr = optimizer.param_groups[0]['lr']
-        losses = train_one_epoch(model, train_loader, optimizer, pw, cfg['box_weight'], dev)
+        losses = train_one_epoch(model, train_loader, optimizer, pw, cfg['box_weight'], dev, box_terms)
         scheduler.step()
 
         preds = predict(model, val_loader, val, dev, cfg['data']['width'], cfg['data']['height'])
-        result = evaluate(preds, gt, np.asarray(cfg['taus']))
+        result = evaluate(preds, gt, np.asarray(cfg['taus']), **aggregation)
         seconds = time.perf_counter() - start
 
         scores = {k: v for k, v in result.items() if k != 'ious'}

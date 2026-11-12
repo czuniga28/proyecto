@@ -9,26 +9,31 @@ from torch.utils.data import Dataset
 BOX_COLUMNS = ['x0', 'y0', 'x1', 'y1']
 
 
-def stack_25d(vol: np.ndarray, s: int) -> np.ndarray:
+def stack_25d(vol: np.ndarray, s: int, context: int = 1) -> np.ndarray:
     """
     Stack slice s and its two neighbours as the channels of a 2.5D image.
 
     Args:
         vol: Volume of shape (D, H, W).
         s: Index of the central slice.
+        context: Distance to the neighbours. 1 is the default 2.5D input; 0
+            repeats slice s three times (a 2D baseline with the same input
+            shape); 2 skips one slice on each side for more z context.
 
     Returns:
-        A float32 array of shape (3, H, W) with slices s-1, s and s+1. At the
-        edges of the volume the extreme slice is repeated.
+        A float32 array of shape (3, H, W) with slices s-context, s and
+        s+context. At the edges of the volume the extreme slice is repeated.
 
     Raises:
-        ValueError: If s is not a slice of vol.
+        ValueError: If s is not a slice of vol or context is negative.
     """
+    if context < 0:
+        raise ValueError(f"context must be >= 0, got {context}")
     # np.clip would turn an invalid s into a valid-looking stack of the extreme slice
     if not 0 <= s < len(vol):
         raise ValueError(f"Slice {s} out of range for a volume of depth {len(vol)}")
 
-    neighbours = np.clip([s - 1, s, s + 1], 0, len(vol) - 1)
+    neighbours = np.clip([s - context, s, s + context], 0, len(vol) - 1)
     return vol[neighbours].astype(np.float32)
 
 
@@ -122,6 +127,7 @@ class SliceDataset(Dataset):
         hflip_p: Probability of a horizontal flip. Left at 0: orientation is
             consistent (anterior on the left), checked in the kneeLR figure.
         max_shift: Largest translation per axis, in pixels of the original image.
+        context: Distance to the neighbouring slices, passed to stack_25d.
     """
 
     def __init__(
@@ -132,12 +138,14 @@ class SliceDataset(Dataset):
         augment: bool = False,
         hflip_p: float = 0.0,
         max_shift: int = 20,
+        context: int = 1,
     ) -> None:
         self.processed_dir = Path(processed_dir)
         self.size = size
         self.augment = augment
         self.hflip_p = hflip_p
         self.max_shift = max_shift
+        self.context = context
 
         self.volume_files = slices['volume_file'].to_numpy()
         self.slice_idx = slices['slice_idx'].to_numpy(dtype=int)
@@ -162,7 +170,7 @@ class SliceDataset(Dataset):
 
     def __getitem__(self, i: int) -> dict[str, torch.Tensor | int]:
         has_box = bool(self.contains_acl[i])
-        img = stack_25d(self._load_volume(self.volume_files[i]), self.slice_idx[i])
+        img = stack_25d(self._load_volume(self.volume_files[i]), self.slice_idx[i], self.context)
 
         # Negatives carry a placeholder through the geometry: their box is reset below
         box = self.boxes[i] if has_box else np.zeros(4)

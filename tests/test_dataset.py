@@ -204,3 +204,21 @@ def test_denormalize_boxes_inverts_the_normalization(tmp_path, slices):
 
     assert pixels.tolist() == [list(ROI)]
     assert denormalize_boxes(np.array([0.5, 0.25, 1.0, 0.75]), 320, 160).tolist() == [160, 40, 320, 120]
+
+
+def test_stack_25d_context_0_is_2d_and_context_2_skips_a_slice():
+    vol = np.arange(5, dtype=np.float16)[:, None, None] * np.ones((5, 4, 6), dtype=np.float16)
+
+    assert stack_25d(vol, 2, context=0)[:, 0, 0].tolist() == [2, 2, 2]
+    assert stack_25d(vol, 2, context=2)[:, 0, 0].tolist() == [0, 2, 4]
+    assert stack_25d(vol, 1, context=2)[:, 0, 0].tolist() == [0, 1, 3]
+    with pytest.raises(ValueError, match='context'):
+        stack_25d(vol, 2, context=-1)
+
+
+def test_dataset_passes_context_to_the_stack(tmp_path, slices):
+    item = SliceDataset(slices, tmp_path, size=64, context=0)[1]
+
+    # Slice 1 is bright and slice 0 is not: with context 0 every channel is slice 1
+    assert torch.equal(item['image'][0], item['image'][1])
+    assert torch.equal(item['image'][2], item['image'][1])
